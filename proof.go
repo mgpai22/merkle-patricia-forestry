@@ -334,7 +334,8 @@ func toInt(value any) (int, error) {
 		if uint64(v) > uint64(math.MaxInt) {
 			return 0, fmt.Errorf("value out of range: %d", v)
 		}
-		return int(v), nil
+		// #nosec G115 -- conversion is safe due to explicit range check above
+		return int(int64(v)), nil
 	case int64:
 		if v < 0 {
 			return 0, fmt.Errorf("negative value: %d", v)
