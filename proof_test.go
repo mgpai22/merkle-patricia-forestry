@@ -15,7 +15,9 @@
 package mpf
 
 import (
+	"bytes"
 	"encoding/hex"
+	"slices"
 	"testing"
 
 	"github.com/blinklabs-io/gouroboros/cbor"
@@ -82,6 +84,22 @@ func TestProofMarshalCbor(t *testing.T) {
 				testDef.expectedCborHex,
 			)
 		}
+
+		var decoded Proof
+		if _, err := cbor.Decode(proofCbor, &decoded); err != nil {
+			t.Fatalf("got unexpected error when decoding proof CBOR: %s", err)
+		}
+
+		roundTripBytes, err := decoded.MarshalCBOR()
+		if err != nil {
+			t.Fatalf("got unexpected error when re-marshaling proof: %s", err)
+		}
+
+		if !bytes.Equal(roundTripBytes, proofCbor) {
+			t.Fatalf("round-trip proof CBOR mismatch")
+		}
+
+		assertProofStepsEqual(t, &decoded, proof)
 	}
 }
 
@@ -4196,5 +4214,85 @@ func TestBigTrieProofMarshalCbor(t *testing.T) {
 			proofCborHex,
 			bigTrieProofExpectedCborHex,
 		)
+	}
+}
+
+func assertProofStepsEqual(t *testing.T, got *Proof, want *Proof) {
+	t.Helper()
+	if len(got.steps) != len(want.steps) {
+		t.Fatalf(
+			"proof step count mismatch\n  got:    %d\n  wanted: %d",
+			len(got.steps),
+			len(want.steps),
+		)
+	}
+	for idx := range want.steps {
+		gotStep := got.steps[idx]
+		wantStep := want.steps[idx]
+		if gotStep.stepType != wantStep.stepType {
+			t.Fatalf(
+				"proof step %d type mismatch\n  got:    %s\n  wanted: %s",
+				idx,
+				gotStep.stepType,
+				wantStep.stepType,
+			)
+		}
+		if gotStep.prefixLength != wantStep.prefixLength {
+			t.Fatalf(
+				"proof step %d prefix length mismatch\n  got:    %d\n  wanted: %d",
+				idx,
+				gotStep.prefixLength,
+				wantStep.prefixLength,
+			)
+		}
+		switch wantStep.stepType {
+		case ProofStepTypeBranch:
+			if len(gotStep.neighbors) != len(wantStep.neighbors) {
+				t.Fatalf(
+					"proof step %d neighbor count mismatch\n  got:    %d\n  wanted: %d",
+					idx,
+					len(gotStep.neighbors),
+					len(wantStep.neighbors),
+				)
+			}
+			for neighborIdx := range wantStep.neighbors {
+				if gotStep.neighbors[neighborIdx] != wantStep.neighbors[neighborIdx] {
+					t.Fatalf(
+						"proof step %d neighbor hash mismatch at index %d",
+						idx,
+						neighborIdx,
+					)
+				}
+			}
+		case ProofStepTypeFork:
+			if gotStep.neighbor.nibble != wantStep.neighbor.nibble {
+				t.Fatalf(
+					"proof step %d neighbor nibble mismatch\n  got:    %d\n  wanted: %d",
+					idx,
+					gotStep.neighbor.nibble,
+					wantStep.neighbor.nibble,
+				)
+			}
+			if !slices.Equal(gotStep.neighbor.prefix, wantStep.neighbor.prefix) {
+				t.Fatalf("proof step %d neighbor prefix mismatch", idx)
+			}
+			if gotStep.neighbor.root != wantStep.neighbor.root {
+				t.Fatalf(
+					"proof step %d neighbor root mismatch\n  got:    %s\n  wanted: %s",
+					idx,
+					gotStep.neighbor.root,
+					wantStep.neighbor.root,
+				)
+			}
+		case ProofStepTypeLeaf:
+			if !slices.Equal(gotStep.neighbor.key, wantStep.neighbor.key) {
+				t.Fatalf("proof step %d neighbor key mismatch", idx)
+			}
+			if gotStep.neighbor.value != wantStep.neighbor.value {
+				t.Fatalf("proof step %d neighbor value mismatch", idx)
+			}
+		default:
+			t.Fatalf("proof step %d has unknown type: %d", idx, wantStep.stepType)
+		}
 	}
 }
