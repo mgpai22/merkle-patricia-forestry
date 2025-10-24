@@ -103,6 +103,60 @@ func TestProofMarshalCbor(t *testing.T) {
 	}
 }
 
+func TestProofUnmarshalForkNeighborOddPrefixBytes(t *testing.T) {
+	oddPrefix := []Nibble{0x0, 0x1, 0x0, 0x2, 0x0, 0x3}
+	neighborRoot := HashValue([]byte("neighbor"))
+
+	proof := &Proof{
+		steps: []ProofStep{
+			{
+				stepType:     ProofStepTypeFork,
+				prefixLength: len(oddPrefix),
+				neighbor: ProofStepNeighbor{
+					prefix: oddPrefix,
+					nibble: 0x4,
+					root:   neighborRoot,
+				},
+			},
+		},
+	}
+
+	encoded, err := proof.MarshalCBOR()
+	if err != nil {
+		t.Fatalf("failed to marshal proof: %v", err)
+	}
+
+	var decoded Proof
+	if err := decoded.UnmarshalCBOR(encoded); err != nil {
+		t.Fatalf("failed to unmarshal proof: %v", err)
+	}
+
+	if len(decoded.steps) != 1 {
+		t.Fatalf("unexpected proof step count: %d", len(decoded.steps))
+	}
+
+	decodedStep := decoded.steps[0]
+	if decodedStep.stepType != ProofStepTypeFork {
+		t.Fatalf("unexpected proof step type: %v", decodedStep.stepType)
+	}
+
+	if decodedStep.prefixLength != len(oddPrefix) {
+		t.Fatalf("unexpected prefix length: %d", decodedStep.prefixLength)
+	}
+
+	if decodedStep.neighbor.nibble != 0x4 {
+		t.Fatalf("unexpected neighbor nibble: %x", decodedStep.neighbor.nibble)
+	}
+
+	if !slices.Equal(decodedStep.neighbor.prefix, oddPrefix) {
+		t.Fatalf("unexpected neighbor prefix: %v", decodedStep.neighbor.prefix)
+	}
+
+	if decodedStep.neighbor.root != neighborRoot {
+		t.Fatalf("unexpected neighbor root: %x", decodedStep.neighbor.root)
+	}
+}
+
 func TestBigTrieProofMarshalCbor(t *testing.T) {
 	trie := NewTrie()
 

@@ -209,9 +209,6 @@ func (s *ProofStep) UnmarshalCBOR(data []byte) error {
 		if err != nil {
 			return fmt.Errorf("invalid fork neighbor prefix: %w", err)
 		}
-		if len(prefixBytes)%2 != 0 {
-			return fmt.Errorf("fork neighbor prefix has odd length: %d", len(prefixBytes))
-		}
 		rootBytes, err := bytesFromField(neighborFields[2])
 		if err != nil {
 			return fmt.Errorf("invalid fork neighbor root: %w", err)
